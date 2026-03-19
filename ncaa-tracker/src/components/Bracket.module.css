@@ -1,0 +1,244 @@
+.container {
+  padding: 20px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.regionTabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.regionTab {
+  padding: 6px 14px;
+  border: 1px solid #dfe1e6;
+  border-radius: 3px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  color: #6b778c;
+}
+.regionTab:hover { border-color: #0052cc; color: #0052cc; }
+.regionTabActive {
+  background: #0052cc;
+  color: #fff;
+  border-color: #0052cc;
+}
+
+.refreshBtn {
+  padding: 6px 14px;
+  background: #0052cc;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  margin-left: auto;
+}
+.refreshBtn:hover { background: #0747a6; }
+
+/* Bracket layout */
+.bracketScroll {
+  overflow-x: auto;
+  padding: 12px 0;
+}
+
+.bracketWrapper {
+  display: flex;
+  gap: 0;
+  min-width: fit-content;
+  align-items: flex-start;
+}
+
+.round {
+  display: flex;
+  flex-direction: column;
+  min-width: 230px;
+  padding: 0 8px;
+}
+
+.roundHeader {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px 0 12px;
+  border-bottom: 2px solid #dfe1e6;
+  margin-bottom: 12px;
+}
+
+.roundSub {
+  font-weight: 400;
+  font-size: 10px;
+  color: #97a0af;
+  margin-top: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.roundGames {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  gap: 8px;
+}
+
+.noData {
+  text-align: center;
+  color: #6b778c;
+  font-size: 12px;
+  padding: 20px;
+}
+
+/* Game card */
+.game {
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 3px;
+  overflow: hidden;
+  font-size: 12px;
+  min-width: 210px;
+  position: relative;
+}
+
+.gameActive {
+  border-color: #de350b;
+  box-shadow: 0 0 0 1px #de350b;
+}
+
+.team {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  gap: 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.team:last-of-type { border-bottom: none; }
+
+.teamWinner { background: #e3fcef; }
+.teamLoser { opacity: 0.5; }
+
+.seed {
+  width: 18px;
+  text-align: center;
+  font-weight: 600;
+  color: #6b778c;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.name {
+  flex: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pts {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: right;
+}
+
+.gameLiveBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 4px;
+  font-size: 10px;
+  color: #de350b;
+  font-weight: 600;
+  background: #fff5f0;
+}
+
+.liveDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #de350b;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Placeholder */
+.placeholder {
+  padding: 20px;
+  text-align: center;
+}
+
+.dates {
+  color: #6b778c;
+  font-size: 13px;
+  margin-top: 20px;
+}
+.datesTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.dates p {
+  margin: 2px 0;
+}
+
+/* States */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b778c;
+}
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #dfe1e6;
+  border-top-color: #0052cc;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.errorBanner {
+  background: #fffae6;
+  border: 1px solid #ffe380;
+  border-radius: 3px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: #974f0c;
+  margin-bottom: 16px;
+}
+
+.lastUpdated {
+  font-size: 11px;
+  color: #6b778c;
+  margin-top: 12px;
+  text-align: right;
+}
