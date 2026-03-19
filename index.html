@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q1 Regional Performance Tracker — Internal Dashboard</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #fff;
+    --border: #dfe1e6;
+    --text: #172b4d;
+    --muted: #6b778c;
+    --accent: #0052cc;
+    --accent-light: #deebff;
+    --green: #00875a;
+    --green-light: #e3fcef;
+    --red: #de350b;
+    --red-light: #ffebe6;
+    --yellow: #ff991f;
+    --yellow-light: #fffae6;
+    --header-bg: #1a1a2e;
+    --row-hover: #f0f2f5;
+    --sidebar: #fafbfc;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Top nav bar — looks like Jira/Confluence */
+  .topbar {
+    background: var(--header-bg);
+    color: #fff;
+    padding: 0 24px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-left { display:flex; align-items:center; gap:20px; }
+  .topbar-logo { font-weight:700; font-size:15px; letter-spacing:0.5px; color:#fff; }
+  .topbar-logo span { color:#4c9aff; }
+  .topbar-nav { display:flex; gap:4px; }
+  .topbar-nav button {
+    background:none; border:none; color:#b3bac5; font-size:13px;
+    padding:6px 12px; border-radius:3px; cursor:pointer; font-family:inherit;
+  }
+  .topbar-nav button:hover, .topbar-nav button.active { background:rgba(255,255,255,0.1); color:#fff; }
+  .topbar-right { display:flex; align-items:center; gap:12px; color:#b3bac5; font-size:12px; }
+  .topbar-avatar {
+    width:28px; height:28px; border-radius:50%; background:#4c9aff;
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:600;
+  }
+
+  /* Sub header */
+  .subheader {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .subheader h1 { font-size:18px; font-weight:600; color:var(--text); }
+  .subheader-meta { font-size:12px; color:var(--muted); }
+
+  /* Tabs */
+  .tabs {
+    background: var(--card);
+    border-bottom: 2px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+  }
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    background: none;
+    border-top: none; border-left: none; border-right: none;
+    font-family: inherit;
+  }
+  .tab:hover { color: var(--accent); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Content area */
+  .content { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filter-bar select, .filter-bar input {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  .filter-bar input { width: 220px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-live { background: var(--red-light); color: var(--red); }
+  .badge-final { background: var(--green-light); color: var(--green); }
+  .badge-scheduled { background: var(--accent-light); color: var(--accent); }
+  .badge-halftime { background: var(--yellow-light); color: var(--yellow); }
+
+  .refresh-btn {
+    padding: 6px 14px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+  }
+  .refresh-btn:hover { background: #0747a6; }
+  .auto-refresh { font-size:11px; color:var(--muted); margin-left:auto; }
+
+  /* Scores table */
+  .scores-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .scores-table thead th {
+    background: #f4f5f7;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .scores-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .scores-table tbody tr:hover { background: var(--row-hover); }
+  .scores-table tbody tr:last-child td { border-bottom: none; }
+
+  .team-cell { display:flex; align-items:center; gap:8px; }
+  .team-logo {
+    width:20px; height:20px; border-radius:2px; object-fit:contain;
+    background:#f0f0f0; flex-shrink:0;
+  }
+  .team-name { font-weight:500; }
+  .team-seed { color:var(--muted); font-size:11px; margin-left:2px; }
+  .team-record { color:var(--muted); font-size:11px; }
+  .score { font-weight:700; font-size:15px; font-variant-numeric:tabular-nums; }
+  .score.winner { color: var(--green); }
+  .game-status { font-size:12px; }
+  .game-matchup {
+    border-left: 3px solid var(--accent);
+    padding-left: 8px;
+  }
+  .game-matchup.live-border { border-left-color: var(--red); }
+
+  /* Loading state */
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .loading-spinner {
+    width:24px; height:24px; border:3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius:50%; animation:spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .empty-state {
+    text-align:center; padding:60px 20px; color:var(--muted);
+  }
+
+  /* ---- BRACKET STYLES ---- */
+  .bracket-container {
+    overflow-x: auto;
+    padding: 20px 0;
+  }
+  .bracket-wrapper {
+    display: flex;
+    gap: 0;
+    min-width: fit-content;
+    align-items: flex-start;
+  }
+  .bracket-round {
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    padding: 0 8px;
+  }
+  .round-header {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 0 12px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .bracket-games {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    flex: 1;
+    gap: 8px;
+  }
+  .bracket-game {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    font-size: 12px;
+    min-width: 200px;
+  }
+  .bracket-game.active { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
+  .bracket-team {
+    display: flex;
+    align-items: center;
+    padding: 5px 8px;
+    gap: 6px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .bracket-team:last-child { border-bottom: none; }
+  .bracket-team.winner { background: var(--green-light); }
+  .bracket-team.loser { opacity: 0.5; }
+  .bracket-seed {
+    width: 18px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .bracket-team-name {
+    flex: 1;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bracket-score {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 24px;
+    text-align: right;
+  }
+  .bracket-team-logo {
+    width: 16px; height: 16px; object-fit: contain; border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .region-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .region-tab {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .region-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .region-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .last-updated { font-size:11px; color:var(--muted); margin-top:12px; text-align:right; }
+
+  /* Responsive */
+  @media (max-width:768px) {
+    .content { padding: 12px; }
+    .subheader { padding: 12px; flex-direction:column; align-items:flex-start; gap:4px; }
+    .filter-bar { gap:8px; }
+    .scores-table { font-size:12px; }
+  }
+
+  .error-banner {
+    background: var(--yellow-light);
+    border: 1px solid #ffe380;
+    border-radius: 3px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: #974f0c;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Navigation -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">Regional<span>Tracker</span></div>
+    <div class="topbar-nav">
+      <button class="active">Dashboard</button>
+      <button>Reports</button>
+      <button>Analytics</button>
+      <button>Settings</button>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="clock"></span>
+    <div class="topbar-avatar">JR</div>
+  </div>
+</div>
+
+<!-- Sub Header -->
+<div class="subheader">
+  <div>
+    <h1>Q1 Regional Performance Tracker</h1>
+    <div class="subheader-meta">March Madness — NCAA Men's Basketball Tournament 2025-26</div>
+  </div>
+  <div class="subheader-meta" id="data-source">Data via ESPN</div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" data-tab="scores">Live Metrics</button>
+  <button class="tab" data-tab="bracket">Bracket Overview</button>
+</div>
+
+<!-- SCORES TAB -->
+<div class="content" id="scores-panel">
+  <div class="filter-bar">
+    <select id="date-select">
+      <option value="today">Today</option>
+    </select>
+    <select id="status-filter">
+      <option value="all">All Statuses</option>
+      <option value="live">In Progress</option>
+      <option value="final">Completed</option>
+      <option value="scheduled">Scheduled</option>
+    </select>
+    <input type="text" id="search-input" placeholder="Search teams...">
+    <button class="refresh-btn" onclick="fetchScores()">↻ Refresh Data</button>
+    <div class="auto-refresh">Auto-refresh: <span id="countdown">30</span>s</div>
+  </div>
+
+  <div id="scores-container">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      Fetching regional performance data...
+    </div>
+  </div>
+
+  <div class="last-updated" id="last-updated"></div>
+</div>
+
+<!-- BRACKET TAB -->
+<div class="content" id="bracket-panel" style="display:none;">
+  <div class="filter-bar">
+    <div class="region-tabs" id="region-tabs">
+      <button class="region-tab active" data-region="all">Full Bracket</button>
+      <button class="region-tab" data-region="south">South Region</button>
+      <button class="region-tab" data-region="east">East Region</button>
+      <button class="region-tab" data-region="west">West Region</button>
+      <button class="region-tab" data-region="midwest">Midwest Region</button>
+    </div>
+    <button class="refresh-btn" onclick="fetchBracket()">↻ Refresh Bracket</button>
+  </div>
+
+  <div id="bracket-container">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      Loading bracket data...
+    </div>
+  </div>
+
+  <div class="last-updated" id="bracket-updated"></div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const ESPN_SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard';
+const ESPN_TOURNAMENT = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=20260301-20260415&groups=100&limit=100';
+const REFRESH_INTERVAL = 30; // seconds
+
+let countdownVal = REFRESH_INTERVAL;
+let currentTab = 'scores';
+let allGames = [];
+let bracketData = [];
+
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleString('en-US', {
+    weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== DATE SELECTOR =====
+function populateDates() {
+  const sel = document.getElementById('date-select');
+  sel.innerHTML = '';
+  for (let i = -3; i <= 3; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const val = d.toISOString().slice(0,10).replace(/-/g,'');
+    const label = i === 0 ? 'Today' : i === -1 ? 'Yesterday' : i === 1 ? 'Tomorrow' :
+      d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', fetchScores);
+}
+populateDates();
+
+// ===== TABS =====
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentTab = tab.dataset.tab;
+    document.getElementById('scores-panel').style.display = currentTab === 'scores' ? '' : 'none';
+    document.getElementById('bracket-panel').style.display = currentTab === 'bracket' ? '' : 'none';
+    if (currentTab === 'bracket' && bracketData.length === 0) fetchBracket();
+  });
+});
+
+// ===== FETCH SCORES =====
+async function fetchScores() {
+  const container = document.getElementById('scores-container');
+  const dateVal = document.getElementById('date-select').value;
+
+  try {
+    // Try tournament games first, fall back to general scoreboard
+    let url = `${ESPN_SCOREBOARD}?dates=${dateVal}&groups=100&limit=50`;
+    let resp = await fetch(url);
+    let data = await resp.json();
+
+    // If no tournament games, fetch all games
+    if (!data.events || data.events.length === 0) {
+      url = `${ESPN_SCOREBOARD}?dates=${dateVal}&limit=50`;
+      resp = await fetch(url);
+      data = await resp.json();
+    }
+
+    allGames = (data.events || []).map(parseGame);
+    renderScores();
+    document.getElementById('last-updated').textContent =
+      'Last sync: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    container.innerHTML = `<div class="error-banner">⚠ Unable to fetch data. Retrying in ${REFRESH_INTERVAL}s. (${e.message})</div>`;
+  }
+}
+
+function parseGame(ev) {
+  const comp = ev.competitions?.[0] || {};
+  const teams = comp.competitors || [];
+  const status = comp.status || ev.status || {};
+  const situation = comp.situation || {};
+
+  const home = teams.find(t => t.homeAway === 'home') || teams[0] || {};
+  const away = teams.find(t => t.homeAway === 'away') || teams[1] || {};
+
+  return {
+    id: ev.id,
+    name: ev.name || '',
+    shortName: ev.shortName || '',
+    home: parseTeam(home),
+    away: parseTeam(away),
+    status: {
+      state: status.type?.state || 'pre',
+      detail: status.type?.shortDetail || status.type?.detail || '',
+      displayClock: status.displayClock || '',
+      period: status.period || 0,
+    },
+    broadcast: comp.broadcasts?.[0]?.names?.[0] || '',
+    note: ev.competitions?.[0]?.notes?.[0]?.headline || '',
+  };
+}
+
+function parseTeam(t) {
+  return {
+    name: t.team?.displayName || t.team?.name || 'TBD',
+    shortName: t.team?.abbreviation || '',
+    logo: t.team?.logo || '',
+    score: parseInt(t.score) || 0,
+    seed: t.curatedRank?.current || t.team?.seed || '',
+    record: t.records?.[0]?.summary || '',
+    winner: t.winner || false,
+  };
+}
+
+function renderScores() {
+  const container = document.getElementById('scores-container');
+  const filter = document.getElementById('status-filter').value;
+  const search = document.getElementById('search-input').value.toLowerCase();
+
+  let games = allGames;
+  if (filter === 'live') games = games.filter(g => g.status.state === 'in');
+  else if (filter === 'final') games = games.filter(g => g.status.state === 'post');
+  else if (filter === 'scheduled') games = games.filter(g => g.status.state === 'pre');
+
+  if (search) {
+    games = games.filter(g =>
+      g.home.name.toLowerCase().includes(search) ||
+      g.away.name.toLowerCase().includes(search) ||
+      g.home.shortName.toLowerCase().includes(search) ||
+      g.away.shortName.toLowerCase().includes(search)
+    );
+  }
+
+  if (games.length === 0) {
+    container.innerHTML = '<div class="empty-state">No matching events found for this date/filter.</div>';
+    return;
+  }
+
+  let html = `<table class="scores-table">
+    <thead><tr>
+      <th>Status</th>
+      <th>Away Team</th>
+      <th>Score</th>
+      <th></th>
+      <th>Score</th>
+      <th>Home Team</th>
+      <th>Detail</th>
+      <th>Network</th>
+    </tr></thead><tbody>`;
+
+  for (const g of games) {
+    const isLive = g.status.state === 'in';
+    const isFinal = g.status.state === 'post';
+    const isPre = g.status.state === 'pre';
+
+    const statusBadge = isLive ? '<span class="badge badge-live">Live</span>' :
+      isFinal ? '<span class="badge badge-final">Final</span>' :
+      '<span class="badge badge-scheduled">Scheduled</span>';
+
+    const awayScoreClass = isFinal && g.away.winner ? 'score winner' : 'score';
+    const homeScoreClass = isFinal && g.home.winner ? 'score winner' : 'score';
+
+    const seedAway = g.away.seed ? `<span class="team-seed">(${g.away.seed})</span>` : '';
+    const seedHome = g.home.seed ? `<span class="team-seed">(${g.home.seed})</span>` : '';
+
+    html += `<tr>
+      <td>${statusBadge}</td>
+      <td><div class="team-cell">
+        ${g.away.logo ? `<img class="team-logo" src="${g.away.logo}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="team-name">${g.away.name}</span>${seedAway}
+        <span class="team-record">${g.away.record}</span>
+      </div></td>
+      <td class="${awayScoreClass}">${isPre ? '-' : g.away.score}</td>
+      <td style="color:var(--muted);font-size:11px;">@</td>
+      <td class="${homeScoreClass}">${isPre ? '-' : g.home.score}</td>
+      <td><div class="team-cell">
+        ${g.home.logo ? `<img class="team-logo" src="${g.home.logo}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="team-name">${g.home.name}</span>${seedHome}
+        <span class="team-record">${g.home.record}</span>
+      </div></td>
+      <td class="game-status">${g.note || g.status.detail}</td>
+      <td style="color:var(--muted)">${g.broadcast}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// Filter listeners
+document.getElementById('status-filter').addEventListener('change', renderScores);
+document.getElementById('search-input').addEventListener('input', renderScores);
+
+// ===== FETCH BRACKET =====
+async function fetchBracket() {
+  const container = document.getElementById('bracket-container');
+  container.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Loading bracket structure...</div>';
+
+  try {
+    // Fetch tournament games across the full March Madness date range
+    const urls = [];
+    // Cover key tournament dates
+    const startDate = new Date('2026-03-15');
+    const endDate = new Date('2026-04-07');
+    const dateStr = `${fmt(startDate)}-${fmt(endDate)}`;
+
+    const resp = await fetch(`${ESPN_SCOREBOARD}?dates=${dateStr}&groups=100&limit=200`);
+    const data = await resp.json();
+
+    if (data.events && data.events.length > 0) {
+      bracketData = data.events.map(parseGame);
+      renderBracket();
+    } else {
+      // If no tournament data yet, show placeholder bracket
+      renderPlaceholderBracket();
+    }
+
+    document.getElementById('bracket-updated').textContent =
+      'Last sync: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    container.innerHTML = `<div class="error-banner">⚠ Unable to load bracket data. (${e.message})</div>`;
+  }
+}
+
+function fmt(d) {
+  return d.toISOString().slice(0,10).replace(/-/g,'');
+}
+
+function renderBracket() {
+  const container = document.getElementById('bracket-container');
+  const region = document.querySelector('.region-tab.active')?.dataset.region || 'all';
+
+  // Organize games by round based on notes/names
+  const rounds = {
+    'First Four': [],
+    'First Round': [],
+    'Second Round': [],
+    'Sweet 16': [],
+    'Elite Eight': [],
+    'Final Four': [],
+    'Championship': [],
+    'Other': [],
+  };
+
+  for (const g of bracketData) {
+    const note = (g.note || '').toLowerCase();
+    const name = (g.name || '').toLowerCase();
+    const combined = note + ' ' + name;
+
+    if (combined.includes('first four')) rounds['First Four'].push(g);
+    else if (combined.includes('1st round') || combined.includes('first round')) rounds['First Round'].push(g);
+    else if (combined.includes('2nd round') || combined.includes('second round')) rounds['Second Round'].push(g);
+    else if (combined.includes('sweet 16') || combined.includes('sweet sixteen')) rounds['Sweet 16'].push(g);
+    else if (combined.includes('elite eight') || combined.includes('elite 8')) rounds['Elite Eight'].push(g);
+    else if (combined.includes('final four') || combined.includes('semifinal')) rounds['Final Four'].push(g);
+    else if (combined.includes('championship') || combined.includes('national championship') || combined.includes('final')) rounds['Championship'].push(g);
+    else rounds['Other'].push(g);
+  }
+
+  // Filter by region if needed
+  if (region !== 'all') {
+    for (const key of Object.keys(rounds)) {
+      if (key === 'Final Four' || key === 'Championship') continue;
+      rounds[key] = rounds[key].filter(g => {
+        const note = (g.note || '').toLowerCase();
+        return note.includes(region);
+      });
+    }
+  }
+
+  let html = '<div class="bracket-wrapper">';
+
+  const roundNames = ['First Four', 'First Round', 'Second Round', 'Sweet 16', 'Elite Eight', 'Final Four', 'Championship'];
+  const workNames = ['Preliminary', 'Round 1 Review', 'Round 2 Review', 'Regional QBR', 'Regional Finals', 'National Semi', 'National Final'];
+
+  for (let r = 0; r < roundNames.length; r++) {
+    const games = rounds[roundNames[r]];
+    if (games.length === 0 && roundNames[r] === 'First Four') continue;
+
+    html += `<div class="bracket-round">
+      <div class="round-header">${workNames[r]}<br><span style="font-weight:400;font-size:10px;color:#97a0af;">${roundNames[r]}</span></div>
+      <div class="bracket-games">`;
+
+    if (games.length === 0) {
+      html += '<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">No data yet</div>';
+    }
+
+    for (const g of games) {
+      const isLive = g.status.state === 'in';
+      const isFinal = g.status.state === 'post';
+
+      html += `<div class="bracket-game ${isLive ? 'active' : ''}">`;
+      for (const team of [g.away, g.home]) {
+        const wClass = isFinal && team.winner ? 'winner' : (isFinal && !team.winner ? 'loser' : '');
+        html += `<div class="bracket-team ${wClass}">
+          <span class="bracket-seed">${team.seed || '-'}</span>
+          ${team.logo ? `<img class="bracket-team-logo" src="${team.logo}" alt="" onerror="this.style.display='none'">` : ''}
+          <span class="bracket-team-name">${team.shortName || team.name}</span>
+          <span class="bracket-score">${g.status.state === 'pre' ? '' : team.score}</span>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += '</div></div>';
+  }
+
+  // "Other" round if present
+  if (rounds['Other'].length > 0) {
+    html += `<div class="bracket-round">
+      <div class="round-header">Unclassified</div>
+      <div class="bracket-games">`;
+    for (const g of rounds['Other']) {
+      const isLive = g.status.state === 'in';
+      const isFinal = g.status.state === 'post';
+      html += `<div class="bracket-game ${isLive ? 'active' : ''}">`;
+      for (const team of [g.away, g.home]) {
+        const wClass = isFinal && team.winner ? 'winner' : (isFinal && !team.winner ? 'loser' : '');
+        html += `<div class="bracket-team ${wClass}">
+          <span class="bracket-seed">${team.seed || '-'}</span>
+          <span class="bracket-team-name">${team.shortName || team.name}</span>
+          <span class="bracket-score">${g.status.state === 'pre' ? '' : team.score}</span>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderPlaceholderBracket() {
+  const container = document.getElementById('bracket-container');
+  container.innerHTML = `
+    <div class="error-banner">
+      ℹ The 2026 NCAA Tournament bracket has not been announced yet or no games are currently available.
+      Bracket data will populate automatically once tournament games are scheduled by ESPN.
+      In the meantime, check the "Live Metrics" tab for today's college basketball scores.
+    </div>
+    <div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">
+      <p style="margin-bottom:8px;font-weight:600;">2026 NCAA Tournament Key Dates</p>
+      <p>Selection Sunday: March 15, 2026</p>
+      <p>First Four: March 17-18, 2026</p>
+      <p>First Round: March 19-20, 2026</p>
+      <p>Second Round: March 21-22, 2026</p>
+      <p>Sweet 16: March 26-27, 2026</p>
+      <p>Elite Eight: March 28-29, 2026</p>
+      <p>Final Four: April 4, 2026</p>
+      <p>Championship: April 6, 2026</p>
+    </div>`;
+}
+
+// Region tab clicks
+document.getElementById('region-tabs').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('region-tab')) return;
+  document.querySelectorAll('.region-tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  if (bracketData.length > 0) renderBracket();
+});
+
+// ===== AUTO REFRESH =====
+function countdown() {
+  countdownVal--;
+  document.getElementById('countdown').textContent = countdownVal;
+  if (countdownVal <= 0) {
+    countdownVal = REFRESH_INTERVAL;
+    if (currentTab === 'scores') fetchScores();
+    else fetchBracket();
+  }
+}
+setInterval(countdown, 1000);
+
+// ===== INIT =====
+fetchScores();
+</script>
+</body>
+</html>
