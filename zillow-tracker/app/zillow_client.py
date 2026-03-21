@@ -156,12 +156,16 @@ async def search_by_address(address: str) -> list[Property]:
                 props = data.get("props") or []
                 for item in props:
                     try:
+                        addr = item.get("address", "Unknown")
+                        c = item.get("addressCity", "")
+                        s = item.get("addressState", "")
+                        z = item.get("addressZipcode", "")
                         nearby.append(Property(
                             zpid=str(item.get("zpid", "")),
-                            address=item.get("address", "Unknown"),
-                            city=item.get("addressCity", ""),
-                            state=item.get("addressState", ""),
-                            zipcode=item.get("addressZipcode", ""),
+                            address=addr,
+                            city=c,
+                            state=s,
+                            zipcode=z,
                             current_price=float(item.get("price", 0)),
                             last_sold_price=_safe_float(item.get("zestimate")) or _safe_float(item.get("lastSoldPrice")),
                             last_sold_date=item.get("dateSold"),
@@ -170,7 +174,7 @@ async def search_by_address(address: str) -> list[Property]:
                             bathrooms=_safe_float(item.get("bathrooms")),
                             living_area=_safe_int(item.get("livingArea")),
                             image_url=item.get("imgSrc"),
-                            detail_url=item.get("detailUrl"),
+                            detail_url=_make_zillow_url(item.get("detailUrl"), addr, c, s, z),
                         ))
                     except (ValueError, TypeError):
                         continue
@@ -201,7 +205,7 @@ async def search_by_address(address: str) -> list[Property]:
         bathrooms=None,
         living_area=None,
         image_url=None,
-        detail_url=None,
+        detail_url=_make_zillow_url(None, street, city, state, zipcode),
     )
     return [placeholder] + nearby
 
@@ -242,7 +246,7 @@ def _parse_property_detail(data: dict, fallback_address: str) -> Property | None
             bathrooms=_safe_float(data.get("bathrooms")),
             living_area=_safe_int(data.get("livingArea")),
             image_url=data.get("imgSrc") or data.get("hiResImageLink"),
-            detail_url=data.get("url"),
+            detail_url=_make_zillow_url(data.get("url") or data.get("detailUrl"), street, city, state, zipcode),
         )
     except (ValueError, TypeError):
         return None
@@ -286,12 +290,16 @@ async def search_properties(location: str, max_pages: int = 5) -> list[Property]
 
             for item in props:
                 try:
+                    addr = item.get("address", "Unknown")
+                    c = item.get("addressCity", location.split(",")[0].strip())
+                    s = item.get("addressState", "")
+                    z = item.get("addressZipcode", "")
                     all_results.append(Property(
                         zpid=str(item.get("zpid", "")),
-                        address=item.get("address", "Unknown"),
-                        city=item.get("addressCity", location.split(",")[0].strip()),
-                        state=item.get("addressState", ""),
-                        zipcode=item.get("addressZipcode", ""),
+                        address=addr,
+                        city=c,
+                        state=s,
+                        zipcode=z,
                         current_price=float(item.get("price", 0)),
                         last_sold_price=_safe_float(item.get("zestimate")) or _safe_float(item.get("lastSoldPrice")),
                         last_sold_date=item.get("dateSold"),
@@ -300,7 +308,7 @@ async def search_properties(location: str, max_pages: int = 5) -> list[Property]
                         bathrooms=_safe_float(item.get("bathrooms")),
                         living_area=_safe_int(item.get("livingArea")),
                         image_url=item.get("imgSrc"),
-                        detail_url=item.get("detailUrl"),
+                        detail_url=_make_zillow_url(item.get("detailUrl"), addr, c, s, z),
                     ))
                 except (ValueError, TypeError):
                     continue
@@ -311,6 +319,27 @@ async def search_properties(location: str, max_pages: int = 5) -> list[Property]
             page += 1
 
     return all_results
+
+
+def _make_zillow_url(detail_url: str | None, address: str = "", city: str = "", state: str = "", zipcode: str = "") -> str:
+    """Build a full Zillow URL. Uses the API detail_url if available,
+    otherwise constructs a search URL from the address components."""
+    if detail_url:
+        url = detail_url.strip()
+        if url.startswith("/"):
+            return "https://www.zillow.com" + url
+        if url.startswith("http"):
+            return url
+        return "https://www.zillow.com/" + url
+
+    # Build a Zillow search URL from the address
+    parts = [address, city, state, zipcode]
+    query = " ".join(p for p in parts if p).strip()
+    if query:
+        encoded = query.replace(" ", "-").replace(",", "").replace(".", "")
+        return f"https://www.zillow.com/homes/{encoded}_rb/"
+
+    return "https://www.zillow.com"
 
 
 def _safe_float(val) -> float | None:
@@ -390,19 +419,20 @@ def _generate_demo_address(address: str) -> list[Property]:
             bathrooms=baths,
             living_area=sqft,
             image_url=None,
-            detail_url=None,
+            detail_url=_make_zillow_url(None, street, city, state, zipcode),
         )
     ]
 
     # Add nearby properties
-    streets = ["Oak", "Maple", "Cedar", "Pine", "Elm", "Birch", "Willow", "Walnut",
-               "Cherry", "Spruce", "Ash", "Hickory", "Magnolia", "Sycamore"]
+    street_names = ["Oak", "Maple", "Cedar", "Pine", "Elm", "Birch", "Willow", "Walnut",
+                    "Cherry", "Spruce", "Ash", "Hickory", "Magnolia", "Sycamore"]
     suffixes = ["St", "Ave", "Dr", "Ln", "Blvd", "Ct", "Way", "Pl"]
 
     for i in range(9):
         num = random.randint(100, 9999)
-        st = random.choice(streets)
+        st = random.choice(street_names)
         suf = random.choice(suffixes)
+        nearby_addr = f"{num} {st} {suf}"
         b_price = random.randint(
             max(100000, base_price - 200000),
             base_price + 200000,
@@ -413,7 +443,7 @@ def _generate_demo_address(address: str) -> list[Property]:
 
         properties.append(Property(
             zpid=f"demo-nearby-{i}-{hash(address) % 10000}",
-            address=f"{num} {st} {suf}",
+            address=nearby_addr,
             city=city,
             state=state,
             zipcode=zipcode,
@@ -425,7 +455,7 @@ def _generate_demo_address(address: str) -> list[Property]:
             bathrooms=random.choice([1.0, 1.5, 2.0, 2.5, 3.0]),
             living_area=random.randint(1000, 4000),
             image_url=None,
-            detail_url=None,
+            detail_url=_make_zillow_url(None, nearby_addr, city, state, zipcode),
         ))
 
     return properties
@@ -477,12 +507,14 @@ def _generate_demo_data(location: str) -> list[Property]:
         sold_month = random.randint(1, 12)
         sold_year = 2026 - years_ago
 
+        demo_addr = f"{num} {street} {suffix}"
+        demo_zip = f"{random.randint(10000, 99999)}"
         properties.append(Property(
             zpid=f"demo-{i}-{hash(location) % 10000}",
-            address=f"{num} {street} {suffix}",
+            address=demo_addr,
             city=city,
             state=state,
-            zipcode=f"{random.randint(10000, 99999)}",
+            zipcode=demo_zip,
             current_price=current_price,
             last_sold_price=float(base_price),
             last_sold_date=f"{sold_year}-{sold_month:02d}-01",
@@ -491,7 +523,7 @@ def _generate_demo_data(location: str) -> list[Property]:
             bathrooms=baths,
             living_area=sqft,
             image_url=None,
-            detail_url=None,
+            detail_url=_make_zillow_url(None, demo_addr, city, state, demo_zip),
         ))
 
     return properties

@@ -351,12 +351,46 @@ main {
     gap: 0.25rem;
 }
 
-/* History Button */
+/* Card Actions */
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.zillow-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    flex: 1;
+    padding: 0.45rem 0.85rem;
+    background: #006aff;
+    border: 1px solid #006aff;
+    border-radius: 6px;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.zillow-link:hover {
+    background: #0050cc;
+    border-color: #0050cc;
+}
+
+.zillow-link svg {
+    flex-shrink: 0;
+}
+
 .history-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.4rem;
-    margin-top: 0.75rem;
+    flex: 1;
     padding: 0.45rem 0.85rem;
     background: transparent;
     border: 1px solid var(--border);
@@ -366,8 +400,6 @@ main {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-    width: 100%;
-    justify-content: center;
 }
 
 .history-btn:hover {
