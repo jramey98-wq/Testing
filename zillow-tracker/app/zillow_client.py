@@ -23,20 +23,96 @@ async def _rate_limit():
 
 
 def _is_address_search(query: str) -> bool:
-    """Detect if a search query looks like a street address vs a city/ZIP."""
+    """Detect if a search query looks like a street address vs a city/ZIP.
+
+    Returns True for anything that resembles a specific street address,
+    including partial addresses. Only returns False for clear city/state
+    or ZIP-only queries.
+    """
     q = query.strip()
-    # Starts with a number followed by text = likely an address
+
+    # Pure ZIP code (5 digits, optionally with +4)
+    if re.match(r'^\d{5}(-\d{4})?$', q):
+        return False
+
+    # Starts with a number followed by text = street address
     if re.match(r'^\d+\s+\w', q):
         return True
-    # Contains common street suffixes
-    street_words = r'\b(st|street|ave|avenue|dr|drive|ln|lane|blvd|boulevard|ct|court|way|pl|place|rd|road|cir|circle|pkwy|parkway|ter|terrace|hwy|highway)\b'
+
+    # Contains common street suffixes anywhere
+    street_words = (
+        r'\b(st|street|ave|avenue|dr|drive|ln|lane|blvd|boulevard|ct|court|'
+        r'way|pl|place|rd|road|cir|circle|pkwy|parkway|ter|terrace|hwy|highway|'
+        r'trail|trl|loop|run|pass|path|row|walk|xing|crossing|'
+        r'aly|alley|cres|crescent|sq|square|mews|grove|glen|knoll|ridge|'
+        r'holw|hollow|frwy|freeway|spur|ramp|pike|turnpike)\b'
+    )
     if re.search(street_words, q, re.IGNORECASE):
         return True
+
+    # Contains a street number anywhere (e.g. "apt 4B, 123 main")
+    if re.search(r'\b\d+\s+[A-Za-z]', q):
+        return True
+
+    # Check if it matches "City, State" pattern exactly (not an address)
+    if re.match(r'^[A-Za-z\s]+,\s*[A-Za-z]{2}$', q):
+        return False
+
+    # If the query has 3+ comma-separated parts, likely an address
+    # e.g. "123 Main, Austin, TX"
+    if len(q.split(",")) >= 3:
+        return True
+
     return False
 
 
+def _parse_address_parts(address: str) -> tuple[str, str, str, str]:
+    """Parse an address string into (street, city, state, zipcode).
+
+    Handles formats like:
+        "123 Main St, Austin, TX 78701"
+        "123 Main St, Austin, TX"
+        "123 Main St, Austin"
+        "123 Main St"
+    """
+    parts = [p.strip() for p in address.split(",")]
+    street = parts[0] if parts else address.strip()
+    city = ""
+    state = ""
+    zipcode = ""
+
+    if len(parts) >= 3:
+        # "street, city, state zip" or "street, city, state"
+        city = parts[1]
+        state_zip = parts[2].strip()
+        m = re.match(r'([A-Za-z]{2})\s*(\d{5})?', state_zip)
+        if m:
+            state = m.group(1).upper()
+            zipcode = m.group(2) or ""
+    elif len(parts) == 2:
+        # Could be "street, city" or "street, state"
+        second = parts[1].strip()
+        m = re.match(r'^([A-Za-z]{2})\s*(\d{5})?$', second)
+        if m:
+            state = m.group(1).upper()
+            zipcode = m.group(2) or ""
+        else:
+            city = second
+
+    # Try to extract ZIP from anywhere in the string
+    if not zipcode:
+        zip_match = re.search(r'\b(\d{5})\b', address)
+        if zip_match:
+            zipcode = zip_match.group(1)
+
+    return street, city, state, zipcode
+
+
 async def search_by_address(address: str) -> list[Property]:
-    """Search for a specific property by address."""
+    """Search for a specific property by address.
+
+    Always guarantees the typed address appears as the first result.
+    """
     if not RAPIDAPI_KEY:
         return _generate_demo_address(address)
 
@@ -45,60 +121,89 @@ async def search_by_address(address: str) -> list[Property]:
         "x-rapidapi-host": RAPIDAPI_HOST,
     }
 
+    primary_prop = None
+    nearby = []
+
     async with httpx.AsyncClient(timeout=30.0) as client:
+        # 1. Try direct property lookup by address
         await _rate_limit()
+        try:
+            resp = await client.get(
+                f"https://{RAPIDAPI_HOST}/propertyByAddress",
+                headers=headers,
+                params={"address": address},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data and isinstance(data, dict) and data.get("zpid"):
+                    primary_prop = _parse_property_detail(data, address)
+        except Exception:
+            pass
 
-        # First try property search by address
-        resp = await client.get(
-            f"https://{RAPIDAPI_HOST}/propertyByAddress",
-            headers=headers,
-            params={"address": address},
-        )
-
-        if resp.status_code == 200:
-            data = resp.json()
-            if data and isinstance(data, dict) and data.get("zpid"):
-                prop = _parse_property_detail(data, address)
-                if prop:
-                    return [prop]
-
-        # Fallback: use extended search with the address as location
+        # 2. Also try extended search to get nearby properties
         await _rate_limit()
-        resp = await client.get(
-            f"https://{RAPIDAPI_HOST}/propertyExtendedSearch",
-            headers=headers,
-            params={
-                "location": address,
-                "status_type": "ForSale",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        try:
+            resp = await client.get(
+                f"https://{RAPIDAPI_HOST}/propertyExtendedSearch",
+                headers=headers,
+                params={
+                    "location": address,
+                    "status_type": "ForSale",
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                props = data.get("props") or []
+                for item in props:
+                    try:
+                        nearby.append(Property(
+                            zpid=str(item.get("zpid", "")),
+                            address=item.get("address", "Unknown"),
+                            city=item.get("addressCity", ""),
+                            state=item.get("addressState", ""),
+                            zipcode=item.get("addressZipcode", ""),
+                            current_price=float(item.get("price", 0)),
+                            last_sold_price=_safe_float(item.get("zestimate")) or _safe_float(item.get("lastSoldPrice")),
+                            last_sold_date=item.get("dateSold"),
+                            home_type=item.get("propertyType"),
+                            bedrooms=_safe_int(item.get("bedrooms")),
+                            bathrooms=_safe_float(item.get("bathrooms")),
+                            living_area=_safe_int(item.get("livingArea")),
+                            image_url=item.get("imgSrc"),
+                            detail_url=item.get("detailUrl"),
+                        ))
+                    except (ValueError, TypeError):
+                        continue
+        except Exception:
+            pass
 
-        props = data.get("props") or []
-        results = []
-        for item in props:
-            try:
-                results.append(Property(
-                    zpid=str(item.get("zpid", "")),
-                    address=item.get("address", "Unknown"),
-                    city=item.get("addressCity", ""),
-                    state=item.get("addressState", ""),
-                    zipcode=item.get("addressZipcode", ""),
-                    current_price=float(item.get("price", 0)),
-                    last_sold_price=_safe_float(item.get("zestimate")) or _safe_float(item.get("lastSoldPrice")),
-                    last_sold_date=item.get("dateSold"),
-                    home_type=item.get("propertyType"),
-                    bedrooms=_safe_int(item.get("bedrooms")),
-                    bathrooms=_safe_float(item.get("bathrooms")),
-                    living_area=_safe_int(item.get("livingArea")),
-                    image_url=item.get("imgSrc"),
-                    detail_url=item.get("detailUrl"),
-                ))
-            except (ValueError, TypeError):
-                continue
+    # 3. Build results — primary address is always first
+    if primary_prop:
+        # Remove duplicate from nearby if the same zpid appears
+        nearby = [p for p in nearby if p.zpid != primary_prop.zpid]
+        return [primary_prop] + nearby
 
-        return results
+    # 4. If API didn't find the exact property, create a placeholder from
+    #    the typed address so the user always sees what they searched for,
+    #    then attach whatever nearby results we got.
+    street, city, state, zipcode = _parse_address_parts(address)
+    placeholder = Property(
+        zpid=f"searched-{hash(address) % 100000}",
+        address=street,
+        city=city,
+        state=state,
+        zipcode=zipcode,
+        current_price=0,
+        last_sold_price=None,
+        last_sold_date=None,
+        home_type=None,
+        bedrooms=None,
+        bathrooms=None,
+        living_area=None,
+        image_url=None,
+        detail_url=None,
+    )
+    return [placeholder] + nearby
 
 
 def _parse_property_detail(data: dict, fallback_address: str) -> Property | None:
@@ -245,17 +350,19 @@ POPULAR_CITIES = [
 
 
 def _generate_demo_address(address: str) -> list[Property]:
-    """Generate a single demo property for an address search."""
+    """Generate a demo property for an address search.
+
+    Always returns the exact typed address as the first result.
+    """
     random.seed(hash(address.lower().strip()))
 
-    # Parse city/state from address if possible (e.g. "123 Main St, Austin, TX 78701")
-    parts = [p.strip() for p in address.split(",")]
-    street = parts[0] if parts else address
-    city = parts[1] if len(parts) > 1 else "Unknown City"
-    state_zip = parts[2].strip() if len(parts) > 2 else ""
-    state_match = re.match(r'([A-Za-z]{2})\s*(\d{5})?', state_zip)
-    state = state_match.group(1).upper() if state_match else "TX"
-    zipcode = state_match.group(2) if state_match and state_match.group(2) else f"{random.randint(10000, 99999)}"
+    street, city, state, zipcode = _parse_address_parts(address)
+    if not city:
+        city = "Unknown City"
+    if not state:
+        state = "TX"
+    if not zipcode:
+        zipcode = f"{random.randint(10000, 99999)}"
 
     beds = random.randint(2, 5)
     baths = random.choice([1.0, 1.5, 2.0, 2.5, 3.0, 3.5])

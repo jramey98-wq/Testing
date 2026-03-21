@@ -193,6 +193,7 @@ function renderCard(item, isPrimary) {
     const hasPrior = item.has_prior_sale;
     const pct = item.price_increase_pct;
     const increase = item.price_increase;
+    const isPlaceholder = p.current_price === 0 && !hasPrior;
 
     let pctClass = "neutral";
     let pctText = "N/A";
@@ -210,6 +211,12 @@ function renderCard(item, isPrimary) {
                 <span>${arrow} ${formatCurrency(Math.abs(increase))}</span>
                 <span>${pctText}</span>
             </div>`;
+    }
+
+    // Show a "no data" banner for placeholder properties (address found but no listing data)
+    let placeholderHtml = "";
+    if (isPlaceholder && isPrimary) {
+        placeholderHtml = `<div class="placeholder-notice">Address found but no active listing data available. Nearby properties shown below.</div>`;
     }
 
     const imgHtml = p.image_url
@@ -233,7 +240,9 @@ function renderCard(item, isPrimary) {
             </div>
             <div class="card-body">
                 <div class="card-address">${escapeHtml(p.address)}</div>
-                <div class="card-location">${escapeHtml(p.city)}, ${escapeHtml(p.state)} ${escapeHtml(p.zipcode)}</div>
+                <div class="card-location">${escapeHtml(p.city)}${p.state ? ", " + escapeHtml(p.state) : ""} ${escapeHtml(p.zipcode)}</div>
+                ${placeholderHtml}
+                ${!isPlaceholder ? `
                 <div class="price-row">
                     <div class="current-price">${formatCurrency(p.current_price)}</div>
                     ${hasPrior ? `
@@ -251,7 +260,7 @@ function renderCard(item, isPrimary) {
                 <button class="history-btn" data-zpid="${escapeHtml(p.zpid)}" data-address="${escapeHtml(p.address)}, ${escapeHtml(p.city)}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     Price History
-                </button>
+                </button>` : ""}
             </div>
         </div>`;
 }

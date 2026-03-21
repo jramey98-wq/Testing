@@ -585,6 +585,16 @@ main {
     padding-top: 1.5rem;
 }
 
+.placeholder-notice {
+    background: rgba(234, 179, 8, 0.1);
+    color: var(--yellow);
+    padding: 0.6rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
 /* Search Examples */
 .search-examples {
     margin-top: 2rem;
