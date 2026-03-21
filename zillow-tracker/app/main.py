@@ -5,8 +5,8 @@ import os
 
 from app.models import SearchResponse
 from app.zillow_client import (
-    search_properties, search_by_address, _is_address_search,
-    RAPIDAPI_KEY, POPULAR_CITIES,
+    search_properties, search_by_address, is_address_search,
+    API_CONFIGURED, PROVIDER_NAME, POPULAR_CITIES,
 )
 from app.price_analyzer import analyze_prices
 from app import cache
@@ -32,13 +32,14 @@ async def search(location: str = Query(..., min_length=2, description="City, Sta
             query=location,
             result_count=len(comparisons),
             results=comparisons,
-            demo_mode=not bool(RAPIDAPI_KEY),
-            search_type="address" if _is_address_search(location) else "area",
+            demo_mode=not API_CONFIGURED,
+            data_source=PROVIDER_NAME,
+            search_type="address" if is_address_search(location) else "area",
         )
 
     try:
         # Route to address search or area search based on input
-        if _is_address_search(location):
+        if is_address_search(location):
             properties = await search_by_address(location)
         else:
             properties = await search_properties(location)
@@ -50,8 +51,9 @@ async def search(location: str = Query(..., min_length=2, description="City, Sta
             query=location,
             result_count=0,
             results=[],
-            demo_mode=not bool(RAPIDAPI_KEY),
-            search_type="address" if _is_address_search(location) else "area",
+            demo_mode=not API_CONFIGURED,
+            data_source=PROVIDER_NAME,
+            search_type="address" if is_address_search(location) else "area",
         )
 
     cache.save_search(location, properties)
@@ -61,8 +63,9 @@ async def search(location: str = Query(..., min_length=2, description="City, Sta
         query=location,
         result_count=len(comparisons),
         results=comparisons,
-        demo_mode=not bool(RAPIDAPI_KEY),
-        search_type="address" if _is_address_search(location) else "area",
+        demo_mode=not API_CONFIGURED,
+        data_source=PROVIDER_NAME,
+        search_type="address" if is_address_search(location) else "area",
     )
 
 
@@ -86,6 +89,7 @@ async def get_cities():
 async def health():
     return {
         "status": "ok",
-        "api_key_configured": bool(RAPIDAPI_KEY),
-        "mode": "live" if RAPIDAPI_KEY else "demo",
+        "api_key_configured": API_CONFIGURED,
+        "mode": "live" if API_CONFIGURED else "demo",
+        "data_source": PROVIDER_NAME,
     }

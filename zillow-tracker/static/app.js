@@ -99,6 +99,17 @@ async function doSearch() {
         const data = await resp.json();
 
         demoBadge.style.display = data.demo_mode ? "inline-block" : "none";
+        if (!data.demo_mode && data.data_source) {
+            const srcBadge = document.getElementById("source-badge");
+            if (srcBadge) {
+                const labels = { rentcast: "RentCast", realtor: "Realtor.com", zillow: "Zillow" };
+                srcBadge.textContent = "Live: " + (labels[data.data_source] || data.data_source);
+                srcBadge.style.display = "inline-block";
+            }
+        } else {
+            const srcBadge = document.getElementById("source-badge");
+            if (srcBadge) srcBadge.style.display = "none";
+        }
         currentResults = data.results;
         currentSearchType = data.search_type || "area";
         statusBar.style.display = "flex";
@@ -492,6 +503,13 @@ async function loadCities() {
 fetch("/api/health").then(r => r.json()).then(data => {
     if (data.mode === "demo") {
         demoBadge.style.display = "inline-block";
+    } else {
+        const srcBadge = document.getElementById("source-badge");
+        if (srcBadge && data.data_source) {
+            const labels = { rentcast: "RentCast", realtor: "Realtor.com", zillow: "Zillow" };
+            srcBadge.textContent = "Live: " + (labels[data.data_source] || data.data_source);
+            srcBadge.style.display = "inline-block";
+        }
     }
 });
 
