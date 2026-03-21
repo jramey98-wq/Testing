@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zillow Price Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="logo">
+                Price Tracker
+                <span>Zillow Listing vs Prior Sale</span>
+            </div>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Enter city, state (e.g. Austin, TX) or ZIP code">
+                <button id="search-btn">Search</button>
+            </div>
+            <span class="demo-badge" id="demo-badge" style="display:none">Demo Mode</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="status-bar" id="status-bar" style="display:none">
+            <span class="result-count" id="result-count"></span>
+            <div class="sort-controls">
+                <button class="sort-btn active" data-sort="pct_desc">% Gain &#9660;</button>
+                <button class="sort-btn" data-sort="pct_asc">% Gain &#9650;</button>
+                <button class="sort-btn" data-sort="price_desc">Price &#9660;</button>
+                <button class="sort-btn" data-sort="price_asc">Price &#9650;</button>
+                <button class="sort-btn" data-sort="change_desc">$ Change</button>
+            </div>
+        </div>
+
+        <div id="results">
+            <div class="empty-state">
+                <h2>Find the Biggest Price Jumps</h2>
+                <p>Search any city or ZIP code to see current listings compared to their last sale price, sorted by the biggest percentage increases.</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
