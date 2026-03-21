@@ -3,13 +3,50 @@ const searchBtn = document.getElementById("search-btn");
 const resultsContainer = document.getElementById("results");
 const statusBar = document.getElementById("status-bar");
 const demoBadge = document.getElementById("demo-badge");
+const suggestionsEl = document.getElementById("suggestions");
 
 let currentResults = [];
 let currentSort = "pct_desc";
+let allCities = [];
 
 searchBtn.addEventListener("click", doSearch);
 searchInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") doSearch();
+    if (e.key === "Enter") {
+        suggestionsEl.style.display = "none";
+        doSearch();
+    }
+});
+
+// City autocomplete
+searchInput.addEventListener("input", () => {
+    const val = searchInput.value.trim().toLowerCase();
+    if (val.length < 2) {
+        suggestionsEl.style.display = "none";
+        return;
+    }
+    const matches = allCities.filter(c => c.toLowerCase().includes(val)).slice(0, 8);
+    if (matches.length === 0) {
+        suggestionsEl.style.display = "none";
+        return;
+    }
+    suggestionsEl.innerHTML = matches.map(c =>
+        `<div class="suggestion-item">${escapeHtml(c)}</div>`
+    ).join("");
+    suggestionsEl.style.display = "block";
+});
+
+suggestionsEl.addEventListener("click", (e) => {
+    if (e.target.classList.contains("suggestion-item")) {
+        searchInput.value = e.target.textContent;
+        suggestionsEl.style.display = "none";
+        doSearch();
+    }
+});
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-wrapper")) {
+        suggestionsEl.style.display = "none";
+    }
 });
 
 // Sort buttons
@@ -22,6 +59,15 @@ document.querySelectorAll(".sort-btn").forEach((btn) => {
     });
 });
 
+// Modal close
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("history-modal").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeModal();
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+});
+
 async function doSearch() {
     const location = searchInput.value.trim();
     if (!location) return;
@@ -31,7 +77,7 @@ async function doSearch() {
     resultsContainer.innerHTML = `
         <div class="loading">
             <div class="spinner"></div>
-            <p>Fetching properties in ${escapeHtml(location)}...</p>
+            <p>Fetching all properties in ${escapeHtml(location)}...</p>
         </div>`;
     statusBar.style.display = "none";
 
@@ -92,6 +138,15 @@ function renderResults(results) {
 
     resultsContainer.innerHTML = '<div class="results-grid">' +
         results.map(renderCard).join("") + "</div>";
+
+    // Attach history button listeners
+    resultsContainer.querySelectorAll(".history-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const zpid = btn.dataset.zpid;
+            const address = btn.dataset.address;
+            showPriceHistory(zpid, address);
+        });
+    });
 }
 
 function renderCard(item) {
@@ -151,14 +206,192 @@ function renderCard(item) {
                 </div>
                 ${changeHtml}
                 ${details ? `<div class="card-details"><span>${details}</span></div>` : ""}
+                <button class="history-btn" data-zpid="${escapeHtml(p.zpid)}" data-address="${escapeHtml(p.address)}, ${escapeHtml(p.city)}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Price History
+                </button>
             </div>
         </div>`;
 }
 
+// ---- Price History Modal ----
+
+async function showPriceHistory(zpid, address) {
+    const modal = document.getElementById("history-modal");
+    document.getElementById("modal-title").textContent = `Price History - ${address}`;
+    document.getElementById("history-tbody").innerHTML = `<tr><td colspan="3">Loading...</td></tr>`;
+    document.getElementById("chart-container").innerHTML = '<canvas id="history-chart"></canvas>';
+    modal.style.display = "flex";
+
+    try {
+        const resp = await fetch(`/api/history/${encodeURIComponent(zpid)}`);
+        const data = await resp.json();
+        const history = data.history || [];
+
+        if (history.length === 0) {
+            document.getElementById("history-tbody").innerHTML =
+                `<tr><td colspan="3" class="no-data">No price history available yet. Check back after tracking for a few days.</td></tr>`;
+            return;
+        }
+
+        renderHistoryTable(history);
+        renderHistoryChart(history);
+    } catch (err) {
+        document.getElementById("history-tbody").innerHTML =
+            `<tr><td colspan="3" class="error-msg">Failed to load history</td></tr>`;
+    }
+}
+
+function renderHistoryTable(history) {
+    const tbody = document.getElementById("history-tbody");
+    let rows = "";
+    for (let i = 0; i < history.length; i++) {
+        const h = history[i];
+        let changeHtml = "-";
+        if (i > 0) {
+            const prev = history[i - 1].price;
+            const diff = h.price - prev;
+            const pct = prev > 0 ? ((diff / prev) * 100).toFixed(1) : "0.0";
+            const cls = diff >= 0 ? "positive" : "negative";
+            const sign = diff >= 0 ? "+" : "";
+            changeHtml = `<span class="${cls}">${sign}${formatCurrency(diff)} (${sign}${pct}%)</span>`;
+        }
+        rows += `<tr>
+            <td>${escapeHtml(h.date)}</td>
+            <td>${formatCurrency(h.price)}</td>
+            <td>${changeHtml}</td>
+        </tr>`;
+    }
+    tbody.innerHTML = rows;
+}
+
+function renderHistoryChart(history) {
+    const canvas = document.getElementById("history-chart");
+    const ctx = canvas.getContext("2d");
+    const container = document.getElementById("chart-container");
+
+    const dpr = window.devicePixelRatio || 1;
+    const width = container.clientWidth;
+    const height = 220;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    ctx.scale(dpr, dpr);
+
+    if (history.length < 2) {
+        ctx.fillStyle = "#8b8fa3";
+        ctx.font = "14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Not enough data points for chart", width / 2, height / 2);
+        return;
+    }
+
+    const prices = history.map(h => h.price);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const range = maxP - minP || 1;
+
+    const padL = 70, padR = 20, padT = 20, padB = 40;
+    const chartW = width - padL - padR;
+    const chartH = height - padT - padB;
+
+    // Background
+    ctx.fillStyle = "#1a1d27";
+    ctx.fillRect(0, 0, width, height);
+
+    // Grid lines
+    const gridLines = 5;
+    ctx.strokeStyle = "#2a2e3d";
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "#8b8fa3";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= gridLines; i++) {
+        const y = padT + (chartH / gridLines) * i;
+        const val = maxP - (range / gridLines) * i;
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(width - padR, y);
+        ctx.stroke();
+        ctx.fillText(formatCurrencyShort(val), padL - 8, y + 4);
+    }
+
+    // X-axis labels
+    ctx.textAlign = "center";
+    const labelStep = Math.max(1, Math.floor(history.length / 6));
+    for (let i = 0; i < history.length; i += labelStep) {
+        const x = padL + (i / (history.length - 1)) * chartW;
+        const date = history[i].date;
+        const short = date.substring(0, 7); // YYYY-MM
+        ctx.fillText(short, x, height - 8);
+    }
+
+    // Line
+    const gradient = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    const trending = prices[prices.length - 1] >= prices[0];
+    if (trending) {
+        gradient.addColorStop(0, "rgba(34, 197, 94, 0.3)");
+        gradient.addColorStop(1, "rgba(34, 197, 94, 0.0)");
+    } else {
+        gradient.addColorStop(0, "rgba(239, 68, 68, 0.3)");
+        gradient.addColorStop(1, "rgba(239, 68, 68, 0.0)");
+    }
+
+    // Area fill
+    ctx.beginPath();
+    for (let i = 0; i < history.length; i++) {
+        const x = padL + (i / (history.length - 1)) * chartW;
+        const y = padT + chartH - ((prices[i] - minP) / range) * chartH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(padL + chartW, padT + chartH);
+    ctx.lineTo(padL, padT + chartH);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Line stroke
+    ctx.beginPath();
+    for (let i = 0; i < history.length; i++) {
+        const x = padL + (i / (history.length - 1)) * chartW;
+        const y = padT + chartH - ((prices[i] - minP) / range) * chartH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = trending ? "#22c55e" : "#ef4444";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Dots on endpoints
+    for (const idx of [0, history.length - 1]) {
+        const x = padL + (idx / (history.length - 1)) * chartW;
+        const y = padT + chartH - ((prices[idx] - minP) / range) * chartH;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = trending ? "#22c55e" : "#ef4444";
+        ctx.fill();
+        ctx.strokeStyle = "#1a1d27";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+}
+
+function closeModal() {
+    document.getElementById("history-modal").style.display = "none";
+}
+
+function formatCurrencyShort(n) {
+    if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(1) + "M";
+    if (n >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K";
+    return "$" + Math.round(n);
+}
+
 function formatCurrency(n) {
     if (n === null || n === undefined) return "N/A";
-    if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
-    if (n >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K";
+    if (Math.abs(n) >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
+    if (Math.abs(n) >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K";
     return "$" + n.toLocaleString();
 }
 
@@ -167,9 +400,36 @@ function escapeHtml(str) {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Load popular cities on startup
+async function loadCities() {
+    try {
+        const resp = await fetch("/api/cities");
+        const data = await resp.json();
+        allCities = data.popular || [];
+
+        // Render popular city buttons on the landing page
+        const container = document.getElementById("popular-cities");
+        if (container && allCities.length > 0) {
+            const sample = allCities.slice(0, 12);
+            container.innerHTML = `<p class="popular-label">Popular cities:</p>` +
+                sample.map(c => `<button class="city-chip">${escapeHtml(c)}</button>`).join("");
+            container.querySelectorAll(".city-chip").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    searchInput.value = btn.textContent;
+                    doSearch();
+                });
+            });
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
 // Check health on load
 fetch("/api/health").then(r => r.json()).then(data => {
     if (data.mode === "demo") {
         demoBadge.style.display = "inline-block";
     }
 });
+
+loadCities();

@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 import os
 
 from app.models import SearchResponse
-from app.zillow_client import search_properties, RAPIDAPI_KEY
+from app.zillow_client import search_properties, RAPIDAPI_KEY, POPULAR_CITIES
 from app.price_analyzer import analyze_prices
 from app import cache
 
@@ -60,6 +60,16 @@ async def search(location: str = Query(..., min_length=2, description="City, Sta
 async def price_history(zpid: str):
     history = cache.get_price_history(zpid)
     return {"zpid": zpid, "history": history}
+
+
+@app.get("/api/cities")
+async def get_cities():
+    """Return popular cities and previously searched cities."""
+    searched = cache.get_cached_cities()
+    return {
+        "popular": POPULAR_CITIES,
+        "recent": searched,
+    }
 
 
 @app.get("/api/health")
