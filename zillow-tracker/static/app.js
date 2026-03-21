@@ -7,6 +7,7 @@ const suggestionsEl = document.getElementById("suggestions");
 
 let currentResults = [];
 let currentSort = "pct_desc";
+let currentSearchType = "area";
 let allCities = [];
 
 searchBtn.addEventListener("click", doSearch);
@@ -55,8 +56,16 @@ document.querySelectorAll(".sort-btn").forEach((btn) => {
         document.querySelectorAll(".sort-btn").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         currentSort = btn.dataset.sort;
-        renderResults(sortResults(currentResults));
+        renderResults(sortResults(currentResults), currentSearchType);
     });
+});
+
+// Example address chips
+document.addEventListener("click", (e) => {
+    if (e.target.classList.contains("example-chip")) {
+        searchInput.value = e.target.dataset.query;
+        doSearch();
+    }
 });
 
 // Modal close
@@ -77,7 +86,7 @@ async function doSearch() {
     resultsContainer.innerHTML = `
         <div class="loading">
             <div class="spinner"></div>
-            <p>Fetching all properties in ${escapeHtml(location)}...</p>
+            <p>Fetching properties for ${escapeHtml(location)}...</p>
         </div>`;
     statusBar.style.display = "none";
 
@@ -91,11 +100,19 @@ async function doSearch() {
 
         demoBadge.style.display = data.demo_mode ? "inline-block" : "none";
         currentResults = data.results;
+        currentSearchType = data.search_type || "area";
         statusBar.style.display = "flex";
-        document.getElementById("result-count").textContent =
-            `${data.result_count} properties found for "${data.query}"`;
 
-        renderResults(sortResults(currentResults));
+        if (currentSearchType === "address") {
+            document.getElementById("result-count").textContent =
+                `Property found at "${data.query}"` +
+                (data.result_count > 1 ? ` + ${data.result_count - 1} nearby` : "");
+        } else {
+            document.getElementById("result-count").textContent =
+                `${data.result_count} properties found for "${data.query}"`;
+        }
+
+        renderResults(sortResults(currentResults), currentSearchType);
     } catch (err) {
         resultsContainer.innerHTML = `<div class="error-msg">Error: ${escapeHtml(err.message)}</div>`;
     } finally {
@@ -126,18 +143,40 @@ function sortResults(results) {
     return sorted;
 }
 
-function renderResults(results) {
+function renderResults(results, searchType) {
     if (results.length === 0) {
         resultsContainer.innerHTML = `
             <div class="empty-state">
                 <h2>No properties found</h2>
-                <p>Try a different city or ZIP code.</p>
+                <p>Try a different address, city, or ZIP code.</p>
             </div>`;
         return;
     }
 
-    resultsContainer.innerHTML = '<div class="results-grid">' +
-        results.map(renderCard).join("") + "</div>";
+    if (searchType === "address" && results.length > 0) {
+        // Show first result as a featured/primary card, rest as nearby
+        const primary = results[0];
+        const nearby = results.slice(1);
+
+        let html = '<div class="address-results">';
+        html += '<div class="primary-property">';
+        html += '<h3 class="section-label">Searched Property</h3>';
+        html += renderCard(primary, true);
+        html += '</div>';
+
+        if (nearby.length > 0) {
+            html += '<div class="nearby-section">';
+            html += `<h3 class="section-label">Nearby Properties (${nearby.length})</h3>`;
+            html += '<div class="results-grid">' + nearby.map(item => renderCard(item, false)).join("") + '</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+
+        resultsContainer.innerHTML = html;
+    } else {
+        resultsContainer.innerHTML = '<div class="results-grid">' +
+            results.map(item => renderCard(item, false)).join("") + "</div>";
+    }
 
     // Attach history button listeners
     resultsContainer.querySelectorAll(".history-btn").forEach(btn => {
@@ -149,7 +188,7 @@ function renderResults(results) {
     });
 }
 
-function renderCard(item) {
+function renderCard(item, isPrimary) {
     const p = item.property;
     const hasPrior = item.has_prior_sale;
     const pct = item.price_increase_pct;
@@ -183,11 +222,14 @@ function renderCard(item) {
     const type = p.home_type ? p.home_type.replace(/_/g, " ").toLowerCase() : "";
     const details = [beds, baths, sqft, type].filter(Boolean).join(" &middot; ");
 
+    const cardClass = isPrimary ? "property-card primary-card" : "property-card";
+
     return `
-        <div class="property-card">
+        <div class="${cardClass}">
             <div class="card-image">
                 ${imgHtml}
                 <span class="pct-badge ${pctClass}">${pctText}</span>
+                ${isPrimary ? '<span class="primary-badge">Searched</span>' : ''}
             </div>
             <div class="card-body">
                 <div class="card-address">${escapeHtml(p.address)}</div>
@@ -411,7 +453,7 @@ async function loadCities() {
         const container = document.getElementById("popular-cities");
         if (container && allCities.length > 0) {
             const sample = allCities.slice(0, 12);
-            container.innerHTML = `<p class="popular-label">Popular cities:</p>` +
+            container.innerHTML = `<p class="popular-label">Or browse by city:</p>` +
                 sample.map(c => `<button class="city-chip">${escapeHtml(c)}</button>`).join("");
             container.querySelectorAll(".city-chip").forEach(btn => {
                 btn.addEventListener("click", () => {

@@ -30,3 +30,4 @@ class SearchResponse(BaseModel):
     result_count: int
     results: list[PriceComparison]
     demo_mode: bool = False
+    search_type: str = "area"  # "area" or "address"

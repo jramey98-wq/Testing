@@ -537,6 +537,88 @@ main {
     padding: 2rem 1rem;
 }
 
+/* Address Search Results */
+.address-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.primary-property {
+    max-width: 500px;
+}
+
+.primary-card {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 4px 20px rgba(99, 102, 241, 0.15);
+}
+
+.primary-card .card-image {
+    height: 220px;
+}
+
+.primary-badge {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--accent);
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.section-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.nearby-section {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+}
+
+/* Search Examples */
+.search-examples {
+    margin-top: 2rem;
+}
+
+.examples-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.example-chip {
+    padding: 0.4rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    color: var(--accent);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.example-chip:hover {
+    background: var(--accent);
+    color: white;
+}
+
 /* Empty & Loading States */
 .empty-state {
     text-align: center;
